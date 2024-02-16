@@ -1,0 +1,341 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["relationJoins"]
+  output          = "../../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ApprovalType {
+  LOAN_REQUEST
+}
+
+enum DisbursedLoanStatus {
+  DELINQUENT
+  DISBURSED
+  COLLECTED_REPAYMENT
+  DUE_PAYMENT
+  WRITTEN_OFF
+  DEFAULTING_LOAN
+  MATURED_LOAN
+  NONE
+}
+
+enum LoanApplicationStatus {
+  APPROVED
+  REJECTED
+  ACTIVE
+  PENDING
+}
+
+enum LoaneeTypes {
+  FIRST_TIMER
+  RETURNING_LOANEE
+}
+
+enum PaymentAttemptStatus {
+  FAILED
+  SUCCESSFUL
+}
+
+enum PaymentType {
+  AUTOMATIC
+  MANUAL
+}
+
+enum RepaymentScheduleType {
+  MONTHLY
+  WEEKLY
+}
+
+enum RepaymentStatus {
+  PAID
+  UNPAID
+}
+
+enum ScheduleStatus {
+  PAID
+  UNPAID
+}
+
+enum TicketInitiator {
+  ADMIN
+  CUSTOMER
+}
+
+enum TicketStatus {
+  OPEN
+  CLOSED
+}
+
+enum TransactionType {
+  DISBURSEMENT
+  REPAYMENT
+}
+
+model User {
+  id                              String                            @id @default(uuid())
+  googleID                        String                            @unique
+  firstName                       String
+  LastName                        String
+  email                           String                            @unique
+  password                        String
+  location                        String
+  address                         String?
+  supervisorId                    String?
+  profileImage                    String?
+  phoneInt                        String?
+  resetPasswordToken              String?                           @unique
+  resetPasswordExpires            String?                           @unique
+  role                            ApplicationRole                   @relation(fields: [applicationRoleId], references: [id])
+  createdAt                       DateTime                          @default(now())
+  updatedAt                       DateTime                          @updatedAt
+  isPhoneVerified                 Boolean                           @default(false)
+  isEmailVerified                 Boolean                           @default(false)
+  isEnabled                       Boolean                           @default(true)
+  isLoggedIn                      Boolean                           @default(false)
+  applicationRoleId               String
+  ApprovalWorkflowApplicationRole ApprovalWorkflowApplicationRole[]
+}
+
+model CustomerRemittaInformation {
+  id                     String     @id @default(uuid())
+  isRemittaUser          Boolean
+  averageSixMonthsSalary Int
+  otherLoansCollected    Int
+  Customer               Customer[]
+}
+
+model KycDetails {
+  id                 String        @id @default(uuid())
+  customerFirstName  String
+  customerMiddleName String
+  customerLastName   String
+  customerEmail      String
+  customerAddress    String
+  customercity       String
+  customerState      String
+  customercountry    String
+  customerPostalcode String
+  customerOccupation String
+  customerPhoneInt   String
+  LoanRequest        LoanRequest[]
+}
+
+model LoanDetails {
+  id                    String                @id @default(uuid())
+  loanAmount            Int
+  loanBalance           Int
+  tenure                Int
+  purpose               String
+  RepaymentScheduleType RepaymentScheduleType @default(MONTHLY)
+  LoanRequest           LoanRequest[]
+}
+
+model ProofOfAddress {
+  id                       String        @id @default(uuid())
+  proofOFAddressFileName   String
+  proofOFAddressFileType   String
+  proofOFAddressFileLength Int
+  proofOFAddressFile       String
+  LoanRequest              LoanRequest[]
+}
+
+model SalaryDetails {
+  id                      String        @id @default(uuid())
+  averageMonthlyNetSalary Int
+  salaryAccountInt        String
+  bankName                String
+  accountName             String
+  LoanRequest             LoanRequest[]
+}
+
+model Account {
+  id           String        @id @default(uuid())
+  balance      Int
+  customer     Customer      @relation(fields: [customerId], references: [id])
+  Transactions Transaction[]
+  customerId   String
+}
+
+model ApplicationRole {
+  id                                           String                                         @id @default(uuid())
+  name                                         String                                         @unique
+  description                                  String?
+  createdAt                                    DateTime                                       @default(now())
+  updatedAt                                    DateTime                                       @updatedAt
+  createdById                                  String?
+  updatedBy                                    String?
+  isDeleted                                    Boolean                                        @default(false)
+  deletedOn                                    DateTime?
+  ApprovalWorkflowApplicationRoleConfiguration ApprovalWorkflowApplicationRoleConfiguration[]
+  customers                                    Customer[]
+  User                                         User[]
+  ApprovalWorkflowApplicationRole              ApprovalWorkflowApplicationRole[]
+}
+
+model ApprovalWorkFlow {
+  id                              String                            @id @default(uuid())
+  isApproved                      Boolean                           @default(false)
+  dateApproved                    DateTime                          @default(now())
+  dateRejected                    DateTime                          @default(now())
+  aWFCId                          String
+  approvalWorkflowApplicationRole ApprovalWorkflowApplicationRole[]
+  ApprovalWorkFlowConfiguration   ApprovalWorkFlowConfiguration?    @relation(fields: [approvalWorkFlowConfigurationId], references: [id])
+  approvalWorkFlowConfigurationId String?
+  LoanRequest                     LoanRequest[]
+}
+
+model ApprovalWorkflowApplicationRole {
+  id               String           @id @default(uuid())
+  ApplicationRole  ApplicationRole  @relation(fields: [roleId], references: [id])
+  roleId           String
+  isApproved       Boolean
+  approvedBy       User             @relation(fields: [userId], references: [id])
+  userId           String
+  rejectedBy       String
+  dateApproved     DateTime
+  dateRejected     DateTime
+  hierarchy        Int
+  ApprovalWorkFlow ApprovalWorkFlow @relation(fields: [aWFId], references: [id])
+  aWFId            String
+}
+
+model ApprovalWorkflowApplicationRoleConfiguration {
+  roleId                        String                        @id @default(uuid())
+  roleName                      String
+  canOverrideAllApprovals       Boolean                       @default(true)
+  hierarchy                     Int
+  ApprovalWorkFlowconfiguration ApprovalWorkFlowConfiguration @relation(fields: [aWFCId], references: [id])
+  aWFCId                        String
+  ApplicationRole               ApplicationRole?              @relation(fields: [applicationRoleId], references: [id])
+  applicationRoleId             String?
+}
+
+model ApprovalWorkFlowConfiguration {
+  id               String                                         @id @default(uuid())
+  action           String
+  dateCreated      DateTime                                       @default(now())
+  Roles            ApprovalWorkflowApplicationRoleConfiguration[]
+  ApprovalWorkFlow ApprovalWorkFlow[]
+}
+
+model Customer {
+  id                           String                     @id @default(uuid())
+  firstName                    String
+  lastName                     String
+  middleName                   String
+  password                     String
+  email                        String                     @unique
+  phoneInt                     String
+  sex                          String
+  dOB                          String
+  occupation                   String
+  address                      String?
+  country                      String
+  state                        String
+  city                         String
+  bvn                          String
+  postalCode                   String?
+  salt                         String
+  createdAt                    DateTime                   @default(now())
+  ApplicationRole              ApplicationRole            @relation(fields: [roleId], references: [id])
+  roleId                       String
+  LoaneeType                   LoaneeTypes                @default(FIRST_TIMER)
+  CustomerRemittaInfo          CustomerRemittaInformation @relation(fields: [customerRemittaInformationId], references: [id])
+  LoanRequests                 LoanRequest[]
+  Account                      Account[]
+  customerRemittaInformationId String
+  Transaction                  Transaction[]
+}
+
+model DisbursementApproval {
+  id                   String              @id @default(uuid())
+  LoanRequest          LoanRequest         @relation(fields: [loanRequestId], references: [id])
+  loanRequestId        String
+  otp                  String?
+  transferCode         String
+  transactionReference String
+  isSuccessful         Boolean
+  disbursedLoanStatus  DisbursedLoanStatus @default(NONE)
+}
+
+model FailedPaymentAttempts {
+  id                   String               @id @default(uuid())
+  amount               Int
+  paymentAttemptStatus PaymentAttemptStatus @default(FAILED)
+  RepaymentSchedule    RepaymentSchedule    @relation(fields: [repaymentScheduleId], references: [id])
+  repaymentScheduleId  String
+  dateCreated          DateTime             @default(now())
+}
+
+model Loan {
+  id                String  @id @default(uuid())
+  name              String
+  isDefault         Boolean
+  interestRate      Int
+  maximumLoanAmount Int
+  minimumSalary     Int
+  maximumTenure     Int
+}
+
+model LoanRequest {
+  id                     String                 @id @default(uuid())
+  bvn                    String
+  loandApplicationStatus LoanApplicationStatus  @default(PENDING)
+  disbursedLoanStatus    DisbursedLoanStatus    @default(NONE)
+  kycDetails             KycDetails             @relation(fields: [kycDetailsId], references: [id])
+  salaryDetails          SalaryDetails          @relation(fields: [salaryDetailsId], references: [id])
+  proofOfAddress         ProofOfAddress         @relation(fields: [proofOfAddressId], references: [id])
+  loanDetails            LoanDetails            @relation(fields: [loanDetailsId], references: [id])
+  interest               Int
+  Customer               Customer               @relation(fields: [customerId], references: [id])
+  customerId             String
+  ApprovalWorkFlow       ApprovalWorkFlow       @relation(fields: [aWFId], references: [id])
+  aWFId                  String
+  RepaymentSchedule      RepaymentSchedule[]
+  DisbursementApproval   DisbursementApproval[]
+  kycDetailsId           String
+  salaryDetailsId        String
+  proofOfAddressId       String
+  loanDetailsId          String
+}
+
+model RepaymentSchedule {
+  id                    String                  @id @default(uuid())
+  amount                Int
+  repaymentAmount       Int
+  loanBalance           Int
+  repaymentType         RepaymentScheduleType   @default(MONTHLY)
+  scheduleStatus        ScheduleStatus          @default(UNPAID)
+  LoanRequest           LoanRequest             @relation(fields: [loanRequestId], references: [id])
+  loanRequestId         String
+  dueDate               DateTime
+  paymentType           PaymentType             @default(AUTOMATIC)
+  transactionId         String?
+  isDue                 Boolean                 @default(true)
+  FailedPaymentAttempts FailedPaymentAttempts[]
+}
+
+model Transaction {
+  id                   String          @id @default(uuid())
+  transactionReference String
+  amount               Int
+  payload              String
+  repaymentStatus      RepaymentStatus
+  isSuccessful         Boolean
+  transactionType      TransactionType
+  repaymentScheduleId  String?
+  loanRequestId        String?
+  Customer             Customer        @relation(fields: [customerId], references: [id])
+  customerId           String
+
+  Account   Account? @relation(fields: [accountId], references: [id])
+  accountId String?
+}
